@@ -5,9 +5,9 @@
 # URL: https://github.com/xolox/python-rotate-backups
 
 """
-Usage: rotate-backups-s3 [OPTIONS] DIRECTORY..
+Usage: rotate-backups-os [OPTIONS] DIRECTORY..
 
-Easy rotation of backups in an AWS S3 bucket based. To use
+Easy rotation of backups in an Object Storage bucket based. To use
 this program you specify a rotation scheme via (a combination of) the --hourly,
 --daily, --weekly, --monthly and/or --yearly options and specify the bucket
 (or multiple buckets) containing backups to rotate as one or more
@@ -26,12 +26,12 @@ Supported options:
 
   -U, --aws-access-key-id
     
-    AWS S3 access ID; ensure that it has enough rights to list and delete from
+    Object Storage access ID; ensure that it has enough rights to list and delete from
     a bucket
 
   -P, --aws-secret-access-key
     
-    AWS S3 secret key
+    Object Storage secret key
 
   -H, --hourly=COUNT
 
@@ -75,13 +75,6 @@ Supported options:
     argument can be repeated. Make sure to quote PATTERN so the shell doesn't
     expand the pattern before it's received by rotate-backups.
 
-  -c, --config=PATH
-
-    Load configuration from the pathname given by PATH. If this option isn't
-    given two default locations are checked: `~/.rotate-backups-s3.ini' and
-    `/etc/rotate-backups-s3.ini'. The first of these two configuration files to
-    exist is loaded. For more details refer to the online documentation.
-
   -n, --dry-run
 
     Don't make any changes, just print what would be done. This makes it easy
@@ -103,34 +96,35 @@ import sys
 
 # External dependencies.
 import coloredlogs
-from humanfriendly import parse_path
 from humanfriendly.terminal import usage
 
 # Modules included in our package.
-from rotate_backups import coerce_retention_period, load_config_file
-from rotate_backups_s3 import S3RotateBackups
+from rotate_backups import coerce_retention_period
+from rotate_backups_os import S3RotateBackups
 
-# Initialize a logger.
+# Initialize a logger
 logger = logging.getLogger(__name__)
 
 
 def main():
-    """Command line interface for the ``rotate-backups-s3`` program."""
+    """Command line interface for the ``rotate-backups-os`` program."""
     coloredlogs.install(syslog=True)
     # Command line option defaults.
-    aws_access_key_id = None
-    aws_secret_access_key = None
-    config_file = None
+    access_key_id = None
+    secret_access_key = None
+    endpoint_url = None
+    region_name = None
     dry_run = False
     exclude_list = []
     include_list = []
     rotation_scheme = {}
+    buckets = []
     # Parse the command line arguments.
     try:
-        options, arguments = getopt.getopt(sys.argv[1:], 'U:P:H:d:w:m:y:I:x:c:nvh', [
-            'aws_access_key_id=', 'aws_secret_access_key=', 'hourly=', 'daily=',
-            'weekly=', 'monthly=', 'yearly=', 'include=',
-            'exclude=', 'config=', 'dry-run', 'verbose', 'help',
+        options, arguments = getopt.getopt(sys.argv[1:], 'U:P:H:d:w:m:y:I:x:nvh', [
+            'access_key_id=', 'secret_access_key=', 'hourly=', 'daily=',
+            'weekly=', 'monthly=', 'yearly=', 'include=', 'bucket=', 'endpoint=',
+            'exclude=', 'region=', 'dry-run', 'verbose', 'help',
         ])
         for option, value in options:
             if option in ('-H', '--hourly'):
@@ -147,12 +141,14 @@ def main():
                 include_list.append(value)
             elif option in ('-x', '--exclude'):
                 exclude_list.append(value)
-            elif option in ('-c', '--config'):
-                config_file = parse_path(value)
             elif option in ('-U', '--aws-access-key-id'):
-                aws_access_key_id = value
+                access_key_id = value
             elif option in ('-P', '--aws-secret-access-key'):
-                aws_secret_access_key = value
+                secret_access_key = value
+            elif option in ('--endpoint'):
+                endpoint_url = value
+            elif option in ('--region'):
+                region_name = value
             elif option in ('-n', '--dry-run'):
                 logger.info("Performing a dry run (because of %s option) ..", option)
                 dry_run = True
@@ -161,28 +157,28 @@ def main():
             elif option in ('-h', '--help'):
                 usage(__doc__)
                 return
+            elif option in ('--bucket'):
+                buckets.append(value) 
             else:
                 assert False, "Unhandled option! (programming error)"
         if rotation_scheme:
             logger.debug("Parsed rotation scheme: %s", rotation_scheme)
 
-        # If no arguments are given but the system has a configuration file
-        # then the backups in the configured directories are rotated.
-        if not arguments:
-            arguments.extend(bucket for bucket, _, _ in load_config_file(config_file))
         # Show the usage message when no directories are given nor configured.
-        if not arguments:
-            usage(__doc__)
-            return
+        #if not arguments:
+        #    usage(__doc__)
+        #    return
     except Exception as e:
         logger.error("%s", e)
         sys.exit(1)
     # Rotate the backups in the given or configured directories.
-    for bucket in arguments:
+    for bucket in buckets:
         S3RotateBackups(
             rotation_scheme=rotation_scheme,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
+            endpoint_url=endpoint_url,
             include_list=include_list,
             exclude_list=exclude_list,
             dry_run=dry_run,

@@ -1,8 +1,8 @@
-rotate-backups-s3: Simple command line interface for S3 backup rotation
+rotate-backups-os: Simple command line interface for Object Storage backup rotation
 =======================================================================
 
-Commandline utility to rotate backup files stored in AWS S3.
-Based on the excellent work of https://github.com/xolox/python-rotate-backups
+Commandline utility to rotate backup files stored in Object Storage (S3 compatible).
+Based on the excellent works of https://github.com/xolox/python-rotate-backups and https://github.com/saltonmassally/python-rotate-backups-s3
 
 .. contents::
    :local:
@@ -38,25 +38,25 @@ Features
 Installation
 ------------
 
-The `rotate-backups-s3` package is available on PyPI_ which means installation
+The `rotate-backups-os` package is available on PyPI_ which means installation
 should be as simple as:
 
 .. code-block:: sh
 
-   $ pip install rotate-backups-s3
+   $ pip install rotate-backups-os
 
 
 Usage
 -----
 
-There are two ways to use the `rotate-backups-s3` package: As the command line
-program ``rotate-backups-s3`` and as a Python API
+There are two ways to use the `rotate-backups-os` package: As the command line
+program ``rotate-backups-os`` and as a Python API
 The command line interface is described below.
 
 Command line
 ~~~~~~~~~~~~
 
-.. A DRY solution to avoid duplication of the `rotate-backups-s3 --help' text:
+.. A DRY solution to avoid duplication of the `rotate-backups-os --help' text:
 ..
 .. [[[cog
 .. from humanfriendly.usage import inject_usage
@@ -121,7 +121,7 @@ Instead of specifying directories and rotation schemes on the command line you
 can also add them to a configuration file.
 
 By default two locations are checked for a configuration file, these are
-``~/.rotate-backups-s3.ini`` and ``/etc/rotate-backups-s3.ini``. The first of these
+``~/.rotate-backups-os.ini`` and ``/etc/rotate-backups-os.ini``. The first of these
 that exists is loaded. You can load a configuration file in a nonstandard
 location using the command line option ``--config``.
 
@@ -131,7 +131,7 @@ define the rotation scheme and other options. Here's an example
 
 .. code-block:: ini
 
-   # /etc/rotate-backups-s3.ini:
+   # /etc/rotate-backups-os.ini:
    # Configuration file for the rotate-backups program that specifies
    # buckets containing backups to be rotated according to specific
    # rotation schemes.

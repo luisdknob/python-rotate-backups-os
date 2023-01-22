@@ -1,4 +1,4 @@
-# rotate-backups: Simple command line interface for backup rotation.
+#backups: Simple command line interface for backup rotation.
 #
 # Author: Peter Odding <peter@peterodding.com>
 # Last Change: March 21, 2016
@@ -13,35 +13,27 @@ The :mod:`rotate_backups` module contains the Python API of the
 """
 
 # Standard library modules.
-import collections
 import datetime
 import fnmatch
-import functools
 import logging
-import os
-import re
 
 # External dependencies.
 from dateutil.relativedelta import relativedelta
-from executor import execute
-from humanfriendly import format_path, parse_path, Timer
-from humanfriendly.text import concatenate, split
-from natsort import natsort
-from six.moves import configparser
+from humanfriendly.text import concatenate
 
-import boto
+import boto3
 from rotate_backups import Backup, RotateBackups, TIMESTAMP_PATTERN
 
 # Semi-standard module versioning.
-__version__ = '0.3'
+__version__ = '0.1'
 
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
 
-GLOBAL_CONFIG_FILE = '/etc/rotate-backups-s3.ini'
+GLOBAL_CONFIG_FILE = '/etc/rotate-backups-os.ini'
 """The pathname of the system wide configuration file (a string)."""
 
-LOCAL_CONFIG_FILE = '~/.rotate-backups-s3.ini'
+LOCAL_CONFIG_FILE = '~/.rotate-backups-os.ini'
 """The pathname of the user specific configuration file (a string)."""
 
 ORDERED_FREQUENCIES = (('hourly', relativedelta(hours=1)),
@@ -68,9 +60,9 @@ dictionary is generated based on the tuples in :data:`ORDERED_FREQUENCIES`.
 
 class S3RotateBackups(RotateBackups):
 
-    """Python API for the ``rotate-backups-s3`` program."""
+    """Python API for the ``rotate-backups-os`` program."""
 
-    def __init__(self, rotation_scheme, aws_access_key_id, aws_secret_access_key,
+    def __init__(self, rotation_scheme, access_key_id, secret_access_key, region_name=None, endpoint_url=None, 
                  include_list=None, exclude_list=None, dry_run=False,
                  config_file=None):
         """
@@ -108,10 +100,12 @@ class S3RotateBackups(RotateBackups):
                                     'best-effort' or 'realtime').
         :param config_file: The pathname of a configuration file (a string).
         """
-        
-        self.aws_access_key_id = aws_access_key_id
-        self.aws_secret_access_key = aws_secret_access_key
-        self.conn = boto.connect_s3(aws_access_key_id, aws_secret_access_key)
+        self.access_key_id = access_key_id
+        self.secret_access_key = secret_access_key
+        self.conn = boto3.client('s3', region_name = region_name,
+            endpoint_url = endpoint_url,
+            aws_access_key_id = access_key_id,
+            aws_secret_access_key = secret_access_key)
 
         super(S3RotateBackups, self).__init__(rotation_scheme,
             include_list=include_list, exclude_list=exclude_list,
@@ -121,10 +115,9 @@ class S3RotateBackups(RotateBackups):
         """
         Rotate the backups in a bucket according to a flexible rotation scheme.
 
-        :param bucketname: S3 bucketthat contains backups to rotate (a string).
+        :param bucketname: Object Storage bucket that contains backups to rotate (a string).
         """
 
-        bucket = self.conn.get_bucket(bucketname)
         # Collect the backups in the given directory.
         sorted_backups = self.collect_backups(bucketname)
         if not sorted_backups:
@@ -152,36 +145,36 @@ class S3RotateBackups(RotateBackups):
                     logger.debug("Marking %s for deletion.", backup.pathname)
                     deleted_files.append(backup.pathname)
         if deleted_files:
-            bucket.delete_keys(deleted_files)
+            for file in deleted_files:
+                self.conn.delete_object(Bucket=bucketname, Key=file)
                     
         if len(backups_to_preserve) == len(sorted_backups):
             logger.info("Nothing to do! (all backups preserved)")
 
-    def collect_backups(self, bucketname):
+    def collect_backups(self, bucket):
         """
-        Collect the backups in the given s3 bucket.
+        Collect the backups in the given Object Storage bucket.
 
-        :param bucket: s3 backup bucket (a string).
+        :param bucket: Object Storage backup bucket (a string).
         :returns: A sorted :class:`list` of :class:`Backup` objects (the
                   backups are sorted by their date).
         """
         backups = []
         
-        bucket = self.conn.get_bucket(bucketname)
-        logger.info("Scanning bucket for backups: %s", bucketname)
+        logger.info("Scanning bucket for backups: %s", bucket)
         
-        for entry in natsort([key.name for key in bucket.list()]):
+        for entry in sorted([key for key in self.conn.list_objects(Bucket=bucket)["Contents"]], key=lambda d: d['LastModified']):
             # Check for a time stamp in the directory entry's name.
-            match = TIMESTAMP_PATTERN.search(entry)
+            match = TIMESTAMP_PATTERN.search(entry['LastModified'].strftime('%Y-%m-%d'))
             if match:
                 # Make sure the entry matches the given include/exclude patterns.
-                if self.exclude_list and any(fnmatch.fnmatch(entry, p) for p in self.exclude_list):
+                if self.exclude_list and any(fnmatch.fnmatch(entry['Key'], p) for p in self.exclude_list):
                     logger.debug("Excluded %r (it matched the exclude list).", entry)
-                elif self.include_list and not any(fnmatch.fnmatch(entry, p) for p in self.include_list):
+                elif self.include_list and not any(fnmatch.fnmatch(entry['Key'], p) for p in self.include_list):
                     logger.debug("Excluded %r (it didn't match the include list).", entry)
                 else:
                     backups.append(S3Backup(
-                        pathname=entry,
+                        pathname=entry['Key'],
                         timestamp=datetime.datetime(*(int(group, 10) for group in match.groups('0'))),
                     ))
             else:

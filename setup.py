@@ -9,7 +9,7 @@
 
 
 """
-Setup script for the ``rotate-backups-s3`` package.
+Setup script for the ``rotate-backups-os`` package.
 
 **python setup.py install**
   Install from the working directory into the current Python environment.
@@ -30,7 +30,7 @@ from setuptools import setup, find_packages
 source_directory = os.path.dirname(os.path.abspath(__file__))
 
 # Find the current version.
-module = os.path.join(source_directory, 'rotate_backups_s3', '__init__.py')
+module = os.path.join(source_directory, 'rotate_backups_os', '__init__.py')
 for line in open(module):
     match = re.match(r'^__version__\s*=\s*["\']([^"\']+)["\']$', line)
     if match:
@@ -45,20 +45,20 @@ readme_file = os.path.join(source_directory, 'README.rst')
 with codecs.open(readme_file, 'r', 'utf-8') as handle:
     readme_text = handle.read()
 
-setup(name='rotate-backups-s3',
+setup(name='rotate-backups-os',
       version=version_string,
-      description="Simple command line interface for S3 backup rotation",
+      description="Simple command line interface for Object Storage backup rotation",
       long_description=readme_text,
-      url='https://github.com/tarzan0820/python-rotate-backups-s3',
-      author='Salton Massally',
-      author_email='salton.massally@gmail.com',
+      url='https://github.com/luisdknob/python-rotate-backups-os',
+      author='Luis Knob',
+      author_email='luisdknob@gmail.com',
       packages=find_packages(),
       entry_points=dict(console_scripts=[
-          'rotate-backups-s3 = rotate_backups_s3.cli:main'
+          'rotate-backups-os = rotate_backups_os.cli:main'
       ]),
       install_requires=[
           'rotate-backups==4.3',
-          'boto',
+          'boto3',
       ],
       classifiers=[
           'Development Status :: 5 - Production/Stable',
@@ -69,8 +69,8 @@ setup(name='rotate-backups-s3',
           'Operating System :: POSIX',
           'Operating System :: Unix',
           'Programming Language :: Python',
-          'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.9',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Topic :: Software Development :: Libraries :: Python Modules',
